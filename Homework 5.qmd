@@ -1,0 +1,73 @@
+---
+title: "Michelle A Silveira"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+## Task 1
+
+#Environment setup and data combination
+
+```{r}
+library(tidyverse)
+```
+
+# Merge the 2 datasets
+
+```{r}
+d1=read.table("student-mat.csv",sep=";",header=TRUE)
+d2=read.table("student-por.csv",sep=";",header=TRUE)
+
+#Using the original code
+j0=merge(d1,d2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
+print(nrow(d3)) # 382 students
+
+#using inner join()
+id_keys <- c(
+  "school","sex","age","address","famsize","Pstatus",
+  "Medu","Fedu","Mjob","Fjob","reason","nursery","internet"
+)
+
+j1 <- inner_join(
+  d1, d2,
+  by = id_keys,
+  suffix = c(".math", ".por")
+)
+
+nrow(j1)     # should be 382 (same as your base::merge)
+names(j1)    # you'll see G1.math, G1.por, etc.
+```
+
+# Inner-join on all shared columns except G1, G2, G3, paid, absences
+```{r}
+drop_cols <- c("G1","G2","G3","paid","absences")
+by_excl5  <- setdiff(intersect(names(d1), names(d2)), drop_cols)
+
+combined <- inner_join(d1, d2, by = by_excl5, suffix = c(".math", ".por"))
+
+nrow(combined)   # check matches 
+```
+
+#Pick four categorical variables and convert them to factors in
+- the math table (d1),
+-the Portuguese table (d2), and
+-the combined table you just created
+```{r}
+cat_vars <- c("school","sex","address","famsize")
+
+to_factor <- function(df) {
+  df %>% mutate(across(all_of(cat_vars), ~ factor(.x)))
+}
+
+d1_fac       <- to_factor(d1)        # math
+d2_fac       <- to_factor(d2)        # Portuguese
+combined_fac <- to_factor(combined)  # joined table to use in later tasks
+
+# quick sanity check
+sapply(d1_fac[cat_vars], is.factor)
+sapply(d2_fac[cat_vars], is.factor)
+sapply(combined_fac[cat_vars], is.factor)
+```
+
