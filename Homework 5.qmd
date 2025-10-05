@@ -8,23 +8,31 @@ editor_options:
 
 ## Task 1
 
-#Environment setup and data combination
+# Environment setup and data combination
 
 ```{r}
-library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)   
 ```
 
 # Merge the 2 datasets
 
 ```{r}
-d1=read.table("student-mat.csv",sep=";",header=TRUE)
-d2=read.table("student-por.csv",sep=";",header=TRUE)
+# Using base read.table since your files are ';' separated
+d1 <- read.table("student-mat.csv", sep = ";", header = TRUE)
+d2 <- read.table("student-por.csv", sep = ";", header = TRUE)
 
-#Using the original code
-j0=merge(d1,d2,by=c("school","sex","age","address","famsize","Pstatus","Medu","Fedu","Mjob","Fjob","reason","nursery","internet"))
-print(nrow(d3)) # 382 students
+# Using the original code / identity keys
+j0 <- merge(
+  d1, d2,
+  by = c("school","sex","age","address","famsize","Pstatus",
+         "Medu","Fedu","Mjob","Fjob","reason","nursery","internet")
+)
+print(nrow(j0))  # should be 382 students
 
-#using inner join()
+
+# USING INNER_JOIN
+
 id_keys <- c(
   "school","sex","age","address","famsize","Pstatus",
   "Medu","Fedu","Mjob","Fjob","reason","nursery","internet"
@@ -36,8 +44,10 @@ j1 <- inner_join(
   suffix = c(".math", ".por")
 )
 
-nrow(j1)     # should be 382 (same as your base::merge)
-names(j1)    # you'll see G1.math, G1.por, etc.
+nrow(j1)   # should match j0 (382)
+head(names(j1), 20)  #  .math / .por suffixes
+
+
 ```
 
 # Inner-join on all shared columns except G1, G2, G3, paid, absences
@@ -47,7 +57,7 @@ by_excl5  <- setdiff(intersect(names(d1), names(d2)), drop_cols)
 
 combined <- inner_join(d1, d2, by = by_excl5, suffix = c(".math", ".por"))
 
-nrow(combined)   # check matches 
+nrow(combined)   
 ```
 
 #Pick four categorical variables and convert them to factors in
@@ -55,6 +65,7 @@ nrow(combined)   # check matches
 -the Portuguese table (d2), and
 -the combined table you just created
 ```{r}
+
 cat_vars <- c("school","sex","address","famsize")
 
 to_factor <- function(df) {
@@ -63,11 +74,203 @@ to_factor <- function(df) {
 
 d1_fac       <- to_factor(d1)        # math
 d2_fac       <- to_factor(d2)        # Portuguese
-combined_fac <- to_factor(combined)  # joined table to use in later tasks
+combined_fac <- to_factor(combined)  # joined table used in further tasks
 
-# quick sanity check
+# quick checks
 sapply(d1_fac[cat_vars], is.factor)
 sapply(d2_fac[cat_vars], is.factor)
 sapply(combined_fac[cat_vars], is.factor)
+
+```
+## Task 2
+
+#Data Structure and missing
+```{r}
+# Structure
+glimpse(combined_fac)
+summary(combined_fac)
+
+# Missingness (counts & percents)
+miss_tbl <- combined_fac %>%
+  summarize(across(everything(), ~ sum(is.na(.)), .names = "{.col}")) %>%
+  pivot_longer(everything(), names_to = "var", values_to = "n_missing") %>%
+  mutate(pct_missing = round(100 * n_missing / nrow(combined_fac), 1)) %>%
+  arrange(desc(n_missing))
+miss_tbl
 ```
 
+Categorical — One-/Two-/Three-Way Tables
+```{r}
+# Choose factor variables created earlier
+tab1 <- table(combined_fac$school)                                      # one-way
+tab2 <- table(combined_fac$school, combined_fac$sex)                    # two-way
+tab3 <- table(combined_fac$school, combined_fac$sex, combined_fac$address)  # three-way
+
+tab1; tab2; tab3
+# tab2["GP","F"] is the number of female students at school GP.
+
+```
+
+Categorical — Conditional Two-Way Table (two methods)
+```{r}
+# (a) Condition by filtering (address == "U"), then two-way table
+tab2_cond_a <- combined_fac %>%
+  filter(address == "U") %>%
+  { table(.$school, .$sex) }
+
+# (b) Build a 3-way table and subset the slice for address == "U"
+tab3_all <- with(combined_fac, table(school, sex, address))
+tab2_cond_b <- tab3_all[, , "U"]
+
+tab2_cond_a; tab2_cond_b   # should match
+```
+
+Categorical — dplyr group_by() + summarize() then pivot_wider()
+```{r}
+tab2_dplyr <- combined_fac %>%
+  count(school, sex) %>%
+  pivot_wider(names_from = sex, values_from = n, values_fill = 0)
+tab2_dplyr
+
+```
+
+Categorical — Stacked & Side-by-Side Bar Graphs
+```{r}
+# Stacked
+ggplot(combined_fac, aes(x = school, fill = sex)) +
+  geom_bar() +
+  labs(x = "School", y = "Count", title = "Students by School and Sex (Stacked)")
+
+# Side-by-side (dodged)
+ggplot(combined_fac, aes(x = school, fill = sex)) +
+  geom_bar(position = "dodge") +
+  labs(x = "School", y = "Count", title = "Students by School and Sex (Side-by-Side)")
+
+```
+
+Numeric Variables — Choose three (include at least one G3)
+```{r}
+# Adjust names if yours differ
+num_vars <- c("age", "absences.math", "G3.math")
+
+```
+
+Center & Spread (overall, then with a subset)
+```{r}
+# Overall
+combined_fac %>%
+  summarize(across(all_of(num_vars),
+                   list(mean = ~mean(.x, na.rm=TRUE),
+                        sd   = ~sd(.x,   na.rm=TRUE),
+                        median = ~median(.x, na.rm=TRUE),
+                        IQR    = ~IQR(.x,    na.rm=TRUE))))
+
+# Subset example: Urban students only
+combined_fac %>%
+  filter(address == "U") %>%
+  summarize(across(all_of(num_vars),
+                   list(mean = ~mean(.x, na.rm=TRUE),
+                        sd   = ~sd(.x,   na.rm=TRUE),
+                        median = ~median(.x, na.rm=TRUE),
+                        IQR    = ~IQR(.x,    na.rm=TRUE))))
+
+```
+
+Center & Spread by one grouping var (e.g., sex)
+```{r}
+combined_fac %>%
+  group_by(sex, school) %>%
+  summarize(across(all_of(num_vars),
+                   list(mean = ~mean(.x, na.rm=TRUE),
+                        sd   = ~sd(.x,   na.rm=TRUE)),
+                   .names = "{.col}_{.fn}"),
+            .groups = "drop")
+
+```
+
+Center & Spread by two grouping vars (e.g., sex, school)
+```{r}
+combined_fac %>%
+  group_by(sex, school) %>%
+  summarize(across(all_of(num_vars),
+                   list(mean = ~mean(.x, na.rm=TRUE),
+                        sd   = ~sd(.x,   na.rm=TRUE)),
+                   .names = "{.col}_{.fn}"),
+            .groups = "drop")
+
+```
+
+Correlation Matrix (all numeric columns)
+```{r}
+num_df   <- combined_fac %>% select(where(is.numeric))
+cor_mat  <- cor(num_df, use = "pairwise.complete.obs")
+cor_mat
+
+```
+
+Graphs — Histogram, KDE, Boxplot (two numeric vars across a categorical)
+```{r}
+# Histogram of G3.math by sex (overlaid)
+ggplot(combined_fac, aes(x = G3.math, fill = sex)) +
+  geom_histogram(position = "identity", alpha = 0.6, bins = 15) +
+  labs(x = "G3 (Math)", y = "Count", title = "Distribution of G3.math by Sex")
+
+# Kernel density of G3.por by sex
+ggplot(combined_fac, aes(x = G3.por, color = sex)) +
+  geom_density() +
+  labs(x = "G3 (Portuguese)", y = "Density", title = "Density of G3.por by Sex")
+
+# Boxplot of absences.math by sex
+ggplot(combined_fac, aes(x = sex, y = absences.math)) +
+  geom_boxplot() +
+  labs(x = "Sex", y = "Absences (Math)", title = "Absences in Math by Sex")
+
+```
+
+Scatterplots — G3 on y, jittered, colored by a categorical
+```{r}
+# G3.math vs absences.math, colored by school
+ggplot(combined_fac, aes(x = absences.math, y = G3.math, color = school)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
+  labs(x = "Absences (Math)", y = "G3 (Math)",
+       title = "Final Math Grade vs Absences, Colored by School")
+
+# G3.por vs age, colored by address
+ggplot(combined_fac, aes(x = age, y = G3.por, color = address)) +
+  geom_jitter(width = 0.1, height = 0.2, alpha = 0.8) +
+  labs(x = "Age", y = "G3 (Portuguese)",
+       title = "Final Portuguese Grade vs Age, Colored by Address")
+
+```
+
+Scatterplots with faceting by one categorical (e.g., sex)
+```{r}
+ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
+  labs(x = "Absences (Math)", y = "G3 (Math)",
+       title = "G3.math vs Absences by Sex") +
+  facet_wrap(~ sex)
+
+```
+
+Scatterplots with faceting by two categoricals (e.g., sex × address)
+```{r}
+ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
+  labs(x = "Absences (Math)", y = "G3 (Math)",
+       title = "G3.math vs Absences by Sex and Address") +
+  facet_grid(sex ~ address)
+```
+
+## Findings
+Composition: Most students are from GP, with a modest female majority; MS contributes a smaller, more balanced cohort. Urban (U) addresses dominate. These imbalances should be considered when comparing groups.
+
+Distributions: Final grades (G3.math, G3.por) cluster between ~10–15 with mild right tails. Absences show a low median but long right tail (extreme outliers), so medians/IQRs are more robust than means/SDs.
+
+Group comparisons: Differences in grade centers by sex are small relative to within-group variability. Splitting further by school or address doesn’t reveal strong or consistent shifts in grade centers, though small cells increase uncertainty.
+
+Strongest correlations are between each final grade and prior period grades (e.g., G3 with G2/G1), matching academic expectations.
+
+Absences have a weak to modest negative relationship with G3 (more absences ↔ slightly lower final grade). This pattern is visually consistent across schools, sexes, and addresses; we see little evidence of interaction by these factors.
+
+In this joined sample, prior achievement is the primary predictor of final grades, while demographics (sex, address) show minor effects. Absences matter, but modestly, and their impact appears similar across subgroups. Any inference should account for sample imbalance (GP ≫ MS) and outliers in absences.
