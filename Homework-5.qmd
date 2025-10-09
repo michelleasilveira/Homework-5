@@ -1,8 +1,10 @@
 ---
 title: "Michelle A Silveira"
-format: html
+format:
+  html:
+    embed-resources: true   
 editor: visual
-editor_options: 
+editor_options:
   chunk_output_type: console
 ---
 
@@ -51,6 +53,7 @@ head(names(j1), 20)  #  .math / .por suffixes
 ```
 
 # Inner-join on all shared columns except G1, G2, G3, paid, absences
+
 ```{r}
 drop_cols <- c("G1","G2","G3","paid","absences")
 by_excl5  <- setdiff(intersect(names(d1), names(d2)), drop_cols)
@@ -60,10 +63,8 @@ combined <- inner_join(d1, d2, by = by_excl5, suffix = c(".math", ".por"))
 nrow(combined)   
 ```
 
-#Pick four categorical variables and convert them to factors in
-- the math table (d1),
--the Portuguese table (d2), and
--the combined table you just created
+#Pick four categorical variables and convert them to factors in - the math table (d1), -the Portuguese table (d2), and -the combined table you just created
+
 ```{r}
 
 cat_vars <- c("school","sex","address","famsize")
@@ -82,9 +83,11 @@ sapply(d2_fac[cat_vars], is.factor)
 sapply(combined_fac[cat_vars], is.factor)
 
 ```
+
 ## Task 2
 
 #Data Structure and missing
+
 ```{r}
 # Structure
 glimpse(combined_fac)
@@ -100,6 +103,7 @@ miss_tbl
 ```
 
 Categorical — One-/Two-/Three-Way Tables
+
 ```{r}
 # Choose factor variables created earlier
 tab1 <- table(combined_fac$school)                                      # one-way
@@ -112,6 +116,7 @@ tab1; tab2; tab3
 ```
 
 Categorical — Conditional Two-Way Table (two methods)
+
 ```{r}
 # (a) Condition by filtering (address == "U"), then two-way table
 tab2_cond_a <- combined_fac %>%
@@ -126,6 +131,7 @@ tab2_cond_a; tab2_cond_b   # should match
 ```
 
 Categorical — dplyr group_by() + summarize() then pivot_wider()
+
 ```{r}
 tab2_dplyr <- combined_fac %>%
   count(school, sex) %>%
@@ -135,6 +141,7 @@ tab2_dplyr
 ```
 
 Categorical — Stacked & Side-by-Side Bar Graphs
+
 ```{r}
 # Stacked
 ggplot(combined_fac, aes(x = school, fill = sex)) +
@@ -149,6 +156,7 @@ ggplot(combined_fac, aes(x = school, fill = sex)) +
 ```
 
 Numeric Variables — Choose three (include at least one G3)
+
 ```{r}
 # Adjust names if yours differ
 num_vars <- c("age", "absences.math", "G3.math")
@@ -156,6 +164,7 @@ num_vars <- c("age", "absences.math", "G3.math")
 ```
 
 Center & Spread (overall, then with a subset)
+
 ```{r}
 # Overall
 combined_fac %>%
@@ -177,6 +186,7 @@ combined_fac %>%
 ```
 
 Center & Spread by one grouping var (e.g., sex)
+
 ```{r}
 combined_fac %>%
   group_by(sex, school) %>%
@@ -189,6 +199,7 @@ combined_fac %>%
 ```
 
 Center & Spread by two grouping vars (e.g., sex, school)
+
 ```{r}
 combined_fac %>%
   group_by(sex, school) %>%
@@ -201,6 +212,7 @@ combined_fac %>%
 ```
 
 Correlation Matrix (all numeric columns)
+
 ```{r}
 num_df   <- combined_fac %>% select(where(is.numeric))
 cor_mat  <- cor(num_df, use = "pairwise.complete.obs")
@@ -209,6 +221,7 @@ cor_mat
 ```
 
 Graphs — Histogram, KDE, Boxplot (two numeric vars across a categorical)
+
 ```{r}
 # Histogram of G3.math by sex (overlaid)
 ggplot(combined_fac, aes(x = G3.math, fill = sex)) +
@@ -228,6 +241,7 @@ ggplot(combined_fac, aes(x = sex, y = absences.math)) +
 ```
 
 Scatterplots — G3 on y, jittered, colored by a categorical
+
 ```{r}
 # G3.math vs absences.math, colored by school
 ggplot(combined_fac, aes(x = absences.math, y = G3.math, color = school)) +
@@ -244,6 +258,7 @@ ggplot(combined_fac, aes(x = age, y = G3.por, color = address)) +
 ```
 
 Scatterplots with faceting by one categorical (e.g., sex)
+
 ```{r}
 ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
   geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
@@ -254,6 +269,7 @@ ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
 ```
 
 Scatterplots with faceting by two categoricals (e.g., sex × address)
+
 ```{r}
 ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
   geom_jitter(width = 0.2, height = 0.2, alpha = 0.8) +
@@ -263,9 +279,10 @@ ggplot(combined_fac, aes(x = absences.math, y = G3.math)) +
 ```
 
 ## Findings
+
 Composition: Most students are from GP, with a modest female majority; MS contributes a smaller, more balanced cohort. Urban (U) addresses dominate. These imbalances should be considered when comparing groups.
 
-Distributions: Final grades (G3.math, G3.por) cluster between ~10–15 with mild right tails. Absences show a low median but long right tail (extreme outliers), so medians/IQRs are more robust than means/SDs.
+Distributions: Final grades (G3.math, G3.por) cluster between \~10–15 with mild right tails. Absences show a low median but long right tail (extreme outliers), so medians/IQRs are more robust than means/SDs.
 
 Group comparisons: Differences in grade centers by sex are small relative to within-group variability. Splitting further by school or address doesn’t reveal strong or consistent shifts in grade centers, though small cells increase uncertainty.
 
