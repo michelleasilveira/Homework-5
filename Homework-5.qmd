@@ -93,7 +93,7 @@ sapply(combined_fac[cat_vars], is.factor)
 glimpse(combined_fac)
 summary(combined_fac)
 
-# Missingness (counts & percents)
+# missing analysis (counts & percents)
 miss_tbl <- combined_fac %>%
   summarize(across(everything(), ~ sum(is.na(.)), .names = "{.col}")) %>%
   pivot_longer(everything(), names_to = "var", values_to = "n_missing") %>%
